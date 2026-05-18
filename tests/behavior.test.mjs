@@ -1542,3 +1542,38 @@ test("tool schema invariant: every tool property has a description", async (t) =
     }
   }
 });
+
+test("tool schema invariant: input schemas use Codex-compatible root objects", async (t) => {
+  const transport = new StdioClientTransport({
+    command: process.execPath,
+    args: [SERVER_ENTRY],
+    env: {
+      ...process.env,
+      MCP_TRANSPORT: "stdio",
+      BAMBU_MODEL: "p1s",
+    },
+    stderr: "pipe",
+  });
+
+  const client = createClient();
+  t.after(async () => { await closeTransport(transport); });
+
+  await client.connect(transport);
+
+  const listToolsResult = await client.listTools();
+
+  for (const tool of listToolsResult.tools) {
+    assert.equal(
+      tool.inputSchema?.type,
+      "object",
+      `${tool.name} input schema root must be an object`
+    );
+    for (const keyword of ["anyOf", "oneOf", "allOf"]) {
+      assert.equal(
+        Object.prototype.hasOwnProperty.call(tool.inputSchema || {}, keyword),
+        false,
+        `${tool.name} input schema root must not use ${keyword}`
+      );
+    }
+  }
+});
